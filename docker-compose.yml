@@ -1,0 +1,17 @@
+version: "3.9"  # optional since v1.27.0
+services:
+  server:
+    image: easee_status
+    tty: true
+    stdin_open: true
+    ports:
+      - "8000:8000"
+    volumes:
+      - logvolume:/var/log/
+volumes:
+  logvolume:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/var/log/CasaMack/easee_status'
