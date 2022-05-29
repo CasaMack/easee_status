@@ -1,42 +1,13 @@
 use std::sync::Arc;
 
-use easee_status::v1::{get_charger_state, EaseeError, SessionState, ChargerState};
-use rocket::{http::Status, serde::json::Json};
-use rocket::State;
 use tokio::sync::Mutex;
 use tracing::Level;
 use tracing_subscriber::{FmtSubscriber, fmt::format::FmtSpan};
-use rocket::response::status;
+
+use easee_status::v1::{routes::*, logic::SessionState};
 
 #[macro_use]
 extern crate rocket;
-
-#[get("/")]
-async fn index(session_state: &State<Arc<Mutex<SessionState>>>) -> status::Custom<Json<Vec<ChargerState>>> {
-    tracing::info!("Handling request");
-    let charger_states = get_charger_state(session_state.inner().to_owned()).await;
-    match charger_states {
-        Ok(chargers) => {
-            tracing::debug!("Got charger states: {}", chargers.len());
-            for charger in &chargers {
-                tracing::trace!("{:?}", charger);
-            }
-            tracing::info!("Ok response");
-            status::Custom(Status::Ok, Json(chargers))
-        }
-        Err(e) => {
-            tracing::info!("Error response");
-            match e {
-                EaseeError::Unathorized => status::Custom(Status::Unauthorized, Json(Vec::new())),
-                EaseeError::LoginFailed => status::Custom(Status::InternalServerError, Json(Vec::new())),
-                EaseeError::HttpFailed => status::Custom(Status::InternalServerError, Json(Vec::new())),
-                EaseeError::InvalidResponse => status::Custom(Status::InternalServerError, Json(Vec::new())),
-                EaseeError::RateLimit => status::Custom(Status::TooManyRequests, Json(Vec::new())),
-            }
-        }
-    }
-}
-
 
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
@@ -63,7 +34,16 @@ async fn main() -> Result<(), rocket::Error> {
     tracing::info!("Igniting rocket");
     let _rocket = rocket::build()
         .manage(state.clone())
-        .mount("/", routes![index])
+        .manage(Cache::default())
+        .mount("/", routes![
+            index,
+            field,
+            field_index,
+            car_charger_usage,
+            easee_lade_mengde,
+            easee_energy_per_hour, 
+            
+        ])
         .launch()
         .await?;
     tracing::info!("Extinguished rocket");
