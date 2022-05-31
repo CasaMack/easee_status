@@ -1,7 +1,7 @@
-FROM rust:alpine as build
+FROM --platform=$BUILDPLATFORM rust as build
 
-RUN apk update
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev libc-dev
+RUN apt update
+RUN apt install -y musl-dev pkg-config libssl-dev libc-dev
 
 COPY Cargo.* ./
 COPY src/ src/
