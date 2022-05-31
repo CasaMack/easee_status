@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM rust as build
+FROM rust as build
 
 RUN apt update
 RUN apt install -y musl-dev pkg-config libssl-dev libc-dev
