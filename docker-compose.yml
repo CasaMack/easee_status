@@ -1,7 +1,7 @@
 version: "3.9"  # optional since v1.27.0
 services:
   server:
-    image: easee_status
+    image: areskiko/easee_status
     tty: true
     stdin_open: true
     ports:
