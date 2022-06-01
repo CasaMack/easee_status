@@ -15,7 +15,7 @@ RUN strip target/release/easee_status
 FROM alpine as run
 
 RUN apk update
-RUN apk add libgcc
+RUN apk add libgcc gcompat
 
 COPY --from=build target/release/easee_status /bin/easee_status
 COPY Rocket.toml Rocket.toml
