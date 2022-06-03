@@ -1,26 +1,29 @@
-FROM rust as build
+FROM alpine as build
 
-RUN apt update
-RUN apt install -y musl-dev pkg-config libssl-dev libc-dev
+RUN apk update
+RUN apk add musl-dev pkgconfig openssl-dev libc-dev
+
+# Install rust tools
+RUN apk add cargo
+# RUN curl -sSf https://sh.rustup.rs > install.sh
+# RUN sh install.sh -y
+# RUN source "${HOME}/.cargo/env"
+
+ENV OPENSSL_STATIC=true
 
 COPY Cargo.* ./
 COPY src/ src/
 
-ENV OPENSSL_STATIC=true
-ENV RUSTFLAGS='-C target-feature=-crt-static'
 RUN cargo build --release
 RUN strip target/release/easee_status
 
-# Works: FROM rust:alpine as run
 FROM alpine as run
 
-RUN apk update
-RUN apk add libgcc gcompat
-
+RUN apk add libgcc
 COPY --from=build target/release/easee_status /bin/easee_status
-COPY Rocket.toml Rocket.toml
 
-EXPOSE 8000
-ENV ROCKET_ADDRESS=0.0.0.0
+ENV INFLUXDB_ADDR="http://192.168.10.102:8086"
+ENV INFLUXDB_DB_NAME="Fibaro"
+ENV INFLUXDB_DB_MEASUREMENT="variable_backup"
 
 CMD ["/bin/easee_status"]

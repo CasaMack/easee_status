@@ -2,12 +2,26 @@ version: "3.9"  # optional since v1.27.0
 services:
   server:
     image: areskiko/easee_status
+
+    # Needed to pass username and password if not set as environment variables
     tty: true
     stdin_open: true
-    ports:
-      - "8000:8000"
+
+    # Easier access to logs
     volumes:
       - logvolume:/var/log/
+    
+    # Settings
+    environment:
+      # Required variables
+      - INFLUXDB_ADDR=http://192.168.10.102:8086
+      - INFLUXDB_DB_NAME=Fibaro
+      - INFLUXDB_DB_MEASUREMENT=variable_backup
+      # Optional variables
+      # - LOG_LEVEL=info # defaults to info
+      # - USERNAME=admin
+      # - PASSWORD=admin
+
 volumes:
   logvolume:
     driver: local

@@ -1,103 +1,43 @@
-use std::{collections::HashMap, error::Error, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc};
 
 use chrono::{prelude::*, Duration};
+
 use tokio::sync::Mutex;
 use tracing::{debug, error, instrument, span, trace, warn, Level};
-use rocket::serde::{Serialize};
 
 use local_credentials;
 
+use super::structs::{ChargerState, EaseeError, SessionState};
+
 const EASEE_BASE: &'static str = "https://api.easee.cloud/api";
 const CHARGERS_ENDPOINT: &'static str = "https://api.easee.cloud/api/chargers";
-const LOGIN_ENDPOINT: &'static str = "https://api.easee.cloud/api/accounts/token";
+const LOGIN_ENDPOINT: &'static str = "https://api.easee.cloud/api/accounts/login";
 const REFRESH_ENDPOINT: &'static str = "https://api.easee.cloud/api/accounts/refresh_token";
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(crate = "rocket::serde")]
-pub struct ChargerState {
-    pub power: f64,
-    pub session: f64,
-    pub energy_per_hour: f64,
-}
-
-#[derive(Debug)]
-pub struct SessionState {
-    pub token: Option<String>,
-    pub refresh_token: Option<String>,
-    pub lifetime: Option<DateTime<Local>>,
-}
-
-impl SessionState {
-    pub fn new() -> Self {
-        SessionState {
-            token: None,
-            lifetime: None,
-            refresh_token: None,
-        }
-    }
-}
-
-impl Default for SessionState {
-    fn default() -> Self {
-        SessionState::new()
-    }
-}
-
-#[derive(Debug)]
-pub enum EaseeError {
-    Unathorized,
-    LoginFailed,
-    HttpFailed,
-    InvalidResponse,
-    RateLimit,
-}
-
-impl std::fmt::Display for EaseeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            EaseeError::Unathorized => write!(f, "Unathorized"),
-            EaseeError::LoginFailed => write!(f, "Login failed"),
-            EaseeError::HttpFailed => write!(f, "Http failed"),
-            EaseeError::InvalidResponse => write!(f, "Invalid response"),
-            EaseeError::RateLimit => write!(f, "Rate limit"),
-        }
-    }
-}
-
-impl Error for EaseeError {
-    fn description(&self) -> &str {
-        match *self {
-            EaseeError::Unathorized => "Unauthorized",
-            EaseeError::LoginFailed => "Login failed",
-            EaseeError::HttpFailed => "Http failed",
-            EaseeError::InvalidResponse => "Invalid response",
-            EaseeError::RateLimit => "Rate limit",
-        }
-    }
-}
-
-#[instrument(skip_all)]
+#[instrument(skip_all, level = "trace")]
 pub async fn get_charger_state(
     session: Arc<Mutex<SessionState>>,
 ) -> Result<Vec<ChargerState>, EaseeError> {
     let ids = get_charger_list(session.to_owned()).await;
     if let Err(e) = ids {
+        debug!("Bubbling error: {}", e);
         return Err(e);
     }
     let ids = ids.unwrap();
     let mut states = Vec::new();
     for id in ids {
-        trace!("Getting charger state charger: {}", id);
-        let state = external_request_charger_state(id, session.to_owned()).await;
+        trace!("Getting charger state charger: {}", &id);
+        let state = external_request_charger_state(&id, session.to_owned()).await;
         if let Err(e) = state {
             return Err(e);
         }
+        trace!("Pushing charger state charger: {}", &id);
         states.push(state.unwrap());
     }
     Ok(states)
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, level = "trace")]
 async fn get_charger_list(session: Arc<Mutex<SessionState>>) -> Result<Vec<String>, EaseeError> {
     refresh_auth(session.to_owned()).await?;
     let client = reqwest::Client::new();
@@ -147,9 +87,9 @@ async fn get_charger_list(session: Arc<Mutex<SessionState>>) -> Result<Vec<Strin
     }
 }
 
-#[instrument(skip(session))]
+#[instrument(skip(session), level = "trace")]
 async fn external_request_charger_state(
-    charger_id: String,
+    charger_id: &str,
     session: Arc<Mutex<SessionState>>,
 ) -> Result<ChargerState, EaseeError> {
     refresh_auth(session.to_owned()).await?;
@@ -208,7 +148,7 @@ async fn external_request_charger_state(
     }
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, ret, level = "trace")]
 async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
     tracing::trace!("Creating client");
     let client = reqwest::Client::builder();
@@ -220,15 +160,30 @@ async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
     }
     let client = client.unwrap();
 
-    tracing::trace!("Attempt to load credentials");
-    let creds = local_credentials::async_get_credentials(None)
-        .await
-        .map_err(|_| EaseeError::LoginFailed)?;
-    tracing::trace!("Got credentials");
     let mut payload = HashMap::new();
-    payload.insert("userName", creds.username);
-    payload.insert("password", creds.password);
-    tracing::trace!("Inserted credentials");
+
+    tracing::trace!("Attempt to get credentials from env");
+    let usr = env::var("USERNAME");
+    let pwd = env::var("PASSWORD");
+    if usr.is_ok() && pwd.is_ok() {
+        tracing::info!("Credentials loaded from env");
+        payload.insert("username", usr.unwrap());
+        payload.insert("password", pwd.unwrap());
+        tracing::trace!("Inserted credentials");
+    } else {
+        tracing::trace!("Credentials not found in env");
+        tracing::trace!("Attempt to load credentials");
+        let creds = local_credentials::async_get_credentials(None)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to load credentials: {}", e);
+                EaseeError::LoginFailed
+            })?;
+        tracing::info!("Credentials loaded from file");
+        payload.insert("userName", creds.username);
+        payload.insert("password", creds.password);
+        tracing::trace!("Inserted credentials");
+    }
 
     debug!("Sending login request");
     let response = client
@@ -237,7 +192,10 @@ async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
         .header("Content-type", "application/json")
         .send()
         .await
-        .map_err(|_| EaseeError::HttpFailed)?;
+        .map_err(|e| {
+            tracing::error!("Failed to send login request: {}", e);
+            EaseeError::HttpFailed
+        })?;
 
     if response.status().is_success() {
         let body = response.text().await.map_err(|_| EaseeError::HttpFailed)?;
@@ -247,18 +205,23 @@ async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
         {
             let _guard = parsing_span.enter();
 
-            let json: serde_json::Value =
-                serde_json::from_str(&body).map_err(|_| EaseeError::InvalidResponse)?;
+            let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+                tracing::error!("Failed to parse response: {}", e);
+                EaseeError::InvalidResponse
+            })?;
 
-            let token = json["accessToken"]
-                .as_str()
-                .ok_or(EaseeError::InvalidResponse)?;
-            let refresh_token = json["refreshToken"]
-                .as_str()
-                .ok_or(EaseeError::InvalidResponse)?;
-            let duration = json["expiresIn"]
-                .as_i64()
-                .ok_or(EaseeError::InvalidResponse)?;
+            let token = json["accessToken"].as_str().ok_or_else(|| {
+                tracing::error!("Error accessing field accessToken");
+                EaseeError::InvalidResponse
+            })?;
+            let refresh_token = json["refreshToken"].as_str().ok_or_else(|| {
+                tracing::error!("Error accessing field refreshToken");
+                EaseeError::InvalidResponse
+            })?;
+            let duration = json["expiresIn"].as_i64().ok_or_else(|| {
+                tracing::error!("Error accessing field expiresIn");
+                EaseeError::InvalidResponse
+            })?;
 
             let mut mutex_guard = session.lock().await;
             mutex_guard.token = Some(token.to_string());
@@ -266,18 +229,21 @@ async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
             mutex_guard.lifetime = Some(
                 Local::now()
                     .checked_add_signed(Duration::seconds(duration))
-                    .ok_or(EaseeError::InvalidResponse)?,
+                    .ok_or_else(|| {
+                        tracing::error!("Chrono overflow");
+                        EaseeError::InvalidResponse
+                    })?,
             );
             debug!("Token: {}", token);
         }
         Ok(())
     } else {
-        error!("Login failed");
+        error!("Login failed: {:?}: {:?}", response.status(), response.status().canonical_reason());
         Err(EaseeError::LoginFailed)
     }
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, level = "trace")]
 async fn refresh_token(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
     let client = reqwest::Client::new();
 
@@ -350,7 +316,7 @@ async fn refresh_token(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeErr
     }
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, level = "trace")]
 async fn refresh_auth(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
     let mutex_guard = session.lock().await;
     if mutex_guard.token.is_some() && mutex_guard.lifetime.is_some() {

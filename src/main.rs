@@ -1,51 +1,38 @@
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
-use tokio::sync::Mutex;
+use tokio::{self, sync::Mutex};
 use tracing::Level;
-use tracing_subscriber::{FmtSubscriber, fmt::format::FmtSpan};
 
-use easee_status::v1::{routes::*, logic::SessionState};
+use easee_status::{get_db_info, tick};
+use easee_status::{v1::run::get_logger, SessionState};
 
-#[macro_use]
-extern crate rocket;
-
-#[rocket::main]
-async fn main() -> Result<(), rocket::Error> {
-
-    let appender = tracing_appender::rolling::daily("./var/log", "easee-status-server");
-    let (non_blocking_appender, _guard) = tracing_appender::non_blocking(appender);
-    let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
-        .with_span_events(FmtSpan::ACTIVE)
-        .with_ansi(false)
-        .with_max_level(Level::TRACE)
-        .with_writer(non_blocking_appender)
-        // completes the builder.
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+#[tokio::main]
+async fn main() {
+    let (subscriber, _guard) = get_logger();
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("setting default subscriber failed");
+    tracing::trace!("Log setup complete");
+    let (db_addr, db_name, db_measurement) = get_db_info();
 
     let s = tracing::span!(Level::TRACE, "main");
     let _guard = s.enter();
 
-    let state = SessionState::new();
-    let state = Arc::new(Mutex::new(state));
-    tracing::info!("Igniting rocket");
-    let _rocket = rocket::build()
-        .manage(state.clone())
-        .manage(Cache::default())
-        .mount("/", routes![
-            index,
-            field,
-            field_index,
-            car_charger_usage,
-            easee_lade_mengde,
-            easee_energy_per_hour, 
-            
-        ])
-        .launch()
-        .await?;
-    tracing::info!("Extinguished rocket");
-    Ok(())
+    let mut interval_timer = tokio::time::interval(
+        chrono::Duration::minutes(
+            env::var("INTERVAL").map_or(1, |i| i.parse().expect("Illegal interval format")),
+        )
+        .to_std()
+        .unwrap(),
+    );
+    let login_state = Arc::new(Mutex::new(SessionState::new()));
+    loop {
+        interval_timer.tick().await;
+
+        tokio::spawn(tick(
+            login_state.clone(),
+            db_addr.clone(),
+            db_name.clone(),
+            db_measurement.clone(),
+        ));
+    }
 }
