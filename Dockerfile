@@ -1,5 +1,6 @@
 FROM alpine as build
 
+
 RUN apk update
 RUN apk add musl-dev pkgconfig openssl-dev libc-dev
 
@@ -8,6 +9,10 @@ RUN apk add cargo
 # RUN curl -sSf https://sh.rustup.rs > install.sh
 # RUN sh install.sh -y
 # RUN source "${HOME}/.cargo/env"
+
+WORKDIR /.cargo/registry/index
+RUN git clone --bare https://github.com/rust-lang/crates.io-index.git github.com-1285ae84e5963aae
+WORKDIR /
 
 ENV OPENSSL_STATIC=true
 
