@@ -2,7 +2,7 @@ FROM alpine as build
 
 
 RUN apk update
-RUN apk add musl-dev pkgconfig openssl-dev libc-dev
+RUN apk add musl-dev pkgconfig openssl-dev libc-dev git
 
 # Install rust tools
 RUN apk add cargo
