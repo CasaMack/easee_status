@@ -30,6 +30,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - run: df -T
       -
         name: Build and push
         uses: docker/build-push-action@v3
