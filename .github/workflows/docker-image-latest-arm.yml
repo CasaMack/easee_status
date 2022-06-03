@@ -1,4 +1,4 @@
-name: Publish Docker image
+name: Publish Docker image latest arm
 
 on:
   push:
@@ -10,7 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: publishing
     steps:
-      - run: |
+      - 
+        name: Update carates.io index
+        run: git clone --bare https://github.com/rust-lang/crates.io-index.git github.com-1285ae84e5963aae
+      - 
+        name: Workaround
+        run: |
           # Workaround for https://github.com/rust-lang/cargo/issues/8719
           sudo mkdir -p /var/lib/docker
           sudo mount -t tmpfs -o size=7G none /var/lib/docker
