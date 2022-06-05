@@ -36,6 +36,8 @@ jobs:
       - 
         name: Install rust
         uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
       -
         name: Install cross
         run: cargo install cross
