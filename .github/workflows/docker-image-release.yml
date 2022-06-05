@@ -45,10 +45,6 @@ jobs:
       -
         name: Compile
         run: cross build --release --target ${{ env.TARGET_LONG }}
-      # TODO: Find a way to use strip
-      # -
-      #   name: Strip
-      #   run: strip target/${{ env.TARGET_LONG }}/release/easee_status
       -
         name: Move
         run: mv target/${{ env.TARGET_LONG }}/release/easee_status ./easee_status

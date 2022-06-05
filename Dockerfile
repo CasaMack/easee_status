@@ -1,5 +1,12 @@
-FROM alpine as run
+FROM alpine as stripper
 
-COPY easee_status /bin/easee_status
+RUN apk add binutils
 
-CMD ["/bin/easee_status"]
+COPY easee_status /easee_status
+RUN strip /easee_status
+
+FROM scratch as run
+
+COPY --from=stripper /easee_status /easee_status
+
+CMD ["/easee_status"]
