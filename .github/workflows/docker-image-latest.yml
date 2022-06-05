@@ -11,7 +11,7 @@ jobs:
     environment: publishing
     strategy:
       matrix:
-        target: [arm/v7, amd]
+        target: [arm/v7, amd64]
     steps:
       -
         name: Write long target
@@ -20,7 +20,7 @@ jobs:
       -
         name: Write long target
         run: echo TARGET_LONG=aarch64-unknown-linux-musl >> $GITHUB_ENV && echo TAG=amd >> $GITHUB_ENV
-        if: ${{ matrix.target == 'amd' }}
+        if: ${{ matrix.target == 'amd64' }}
       -
         name: Checkout
         uses: actions/checkout@v2
