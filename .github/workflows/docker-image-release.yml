@@ -17,11 +17,11 @@ jobs:
       -
         name: Write long target
         run: echo TARGET_LONG=armv7-unknown-linux-musleabihf >> $GITHUB_ENV && echo TAG=arm >> $GITHUB_ENV 
-        if: target = 'armv/v7'
+        if: ${{ matrix.target == 'arm/v7' }}
       -
         name: Write long target
         run: echo TARGET_LONG=aarch64-unknown-linux-musl >> $GITHUB_ENV && echo TAG=amd >> $GITHUB_ENV
-        if: target = 'amd'
+        if: ${{ matrix.target == 'amd' }}
       -
         name: Checkout
         uses: actions/checkout@v2
@@ -45,9 +45,10 @@ jobs:
       -
         name: Compile
         run: cross build --release --target ${{ env.TARGET_LONG }}
-      -
-        name: Strip
-        run: strip target/${{ env.TARGET_LONG }}/release/easee_status
+      # TODO: Find a way to use strip
+      # -
+      #   name: Strip
+      #   run: strip target/${{ env.TARGET_LONG }}/release/easee_status
       -
         name: Move
         run: mv target/${{ env.TARGET_LONG }}/release/easee_status ./easee_status
