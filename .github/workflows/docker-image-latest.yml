@@ -1,9 +1,8 @@
-name: Publish Docker image release
+name: Publish Docker image latest
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [ master ]
 
 jobs:
   build_and_push:
@@ -17,11 +16,11 @@ jobs:
       -
         name: Write long target
         run: echo TARGET_LONG=armv7-unknown-linux-musleabihf >> $GITHUB_ENV && echo TAG=arm >> $GITHUB_ENV 
-        if: target = 'armv/v7'
+        if: ${{ matrix.target }} = 'armv/v7'
       -
         name: Write long target
         run: echo TARGET_LONG=aarch64-unknown-linux-musl >> $GITHUB_ENV && echo TAG=amd >> $GITHUB_ENV
-        if: target = 'amd'
+        if: ${{ matrix.target }} = 'amd'
       -
         name: Checkout
         uses: actions/checkout@v2
@@ -49,12 +48,7 @@ jobs:
       -
         name: Move
         run: mv target/${{ env.TARGET_LONG }}/release/easee_status ./easee_status
-      -
-        name: Copy
-        run: cp easee_status easee_status-${{ env.tag }}
-      - 
-        name: Set tag env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      
       -
         name: Build and push
         uses: docker/build-push-action@v3
@@ -62,9 +56,4 @@ jobs:
           context: .
           platforms: linux/${{ matrix.target }}
           push: true
-          tags: areskiko/easee_status:${{ env.TAG }}-${{ env.RELEASE_VERSION }}
-      
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: easee_status-${{ env.TAG }}
+          tags: areskiko/easee_status:${{ env.TAG }}

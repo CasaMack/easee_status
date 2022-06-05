@@ -17,3 +17,6 @@ influxdb = { version = "0.5.2", features = ["derive"] }
 # Bin dependencies
 tracing-subscriber = { version = "0.3" }
 tracing-appender = { version = "0.2" }
+
+# Thou shall compile
+openssl = { version = "0.10.29", features = ["vendored"] }
