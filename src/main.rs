@@ -9,10 +9,9 @@ use easee_status::{v1::run::get_logger, SessionState};
 #[tokio::main]
 async fn main() {
     let (subscriber, _guard) = get_logger();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     tracing::trace!("Log setup complete");
-    let (db_addr, db_name, db_measurement) = get_db_info();
+    let (db_addr, db_name) = get_db_info();
 
     let s = tracing::span!(Level::TRACE, "main");
     let _guard = s.enter();
@@ -28,11 +27,6 @@ async fn main() {
     loop {
         interval_timer.tick().await;
 
-        tokio::spawn(tick(
-            login_state.clone(),
-            db_addr.clone(),
-            db_name.clone(),
-            db_measurement.clone(),
-        ));
+        tokio::spawn(tick(login_state.clone(), db_addr.clone(), db_name.clone()));
     }
 }

@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, sync::Arc};
 use chrono::{prelude::*, Duration};
 
 use tokio::sync::Mutex;
-use tracing::{debug, error, instrument, span, trace, warn, Level};
+use tracing::{debug, error, instrument, span, trace, warn, Level, info};
 
 use local_credentials;
 
@@ -126,6 +126,7 @@ async fn external_request_charger_state(
                     .as_f64()
                     .ok_or(EaseeError::InvalidResponse)?;
                 charger_state = ChargerState {
+                    id: charger_id.to_string(),
                     power,
                     session,
                     energy_per_hour,
@@ -173,7 +174,9 @@ async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
     } else {
         tracing::trace!("Credentials not found in env");
         tracing::trace!("Attempt to load credentials");
-        let creds = local_credentials::async_get_credentials(None)
+        let file = env::var("CREDENTIALS_FILE").ok();
+        let file_str = (&file).as_ref().map(|x| x.as_str());
+        let creds = local_credentials::async_get_credentials(file_str)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to load credentials: {}", e);
@@ -236,9 +239,15 @@ async fn login(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeError> {
             );
             debug!("Token: {}", token);
         }
+
+        info!("Login success");
         Ok(())
     } else {
-        error!("Login failed: {:?}: {:?}", response.status(), response.status().canonical_reason());
+        error!(
+            "Login failed: {:?}: {:?}",
+            response.status(),
+            response.status().canonical_reason()
+        );
         Err(EaseeError::LoginFailed)
     }
 }
@@ -309,6 +318,8 @@ async fn refresh_token(session: Arc<Mutex<SessionState>>) -> Result<(), EaseeErr
             );
             debug!("Token: {}", token);
         }
+
+        info!("Token refreshed");
         Ok(())
     } else {
         error!("Token refresh failed");

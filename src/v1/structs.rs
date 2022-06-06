@@ -5,6 +5,7 @@ use influxdb::InfluxDbWriteable;
 
 #[derive(Debug)]
 pub struct ChargerState {
+    pub id: String,
     pub power: f64,
     pub session: f64,
     pub energy_per_hour: f64,

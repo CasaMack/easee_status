@@ -9,20 +9,24 @@ services:
 
     # Easier access to logs
     volumes:
-      - logvolume:/var/log/
+      - logVolume:/var/log/
+      # - credentialVolume:/credentials/
     
     # Settings
     environment:
       # Required variables
-      - INFLUXDB_ADDR=http://192.168.10.102:8086
-      - INFLUXDB_DB_NAME=Fibaro
-      - INFLUXDB_DB_MEASUREMENT=variable_backup
+      - INFLUXDB_ADDR=http://localhost:8086
+      - INFLUXDB_DB_NAME=MyDatabase
       # Optional variables
       # - LOG_LEVEL=info # defaults to info
+      # - CREDENTIALS_FILE=/credentials/credentials
+      # Update interval, measured in minutes. 
+      # - INTERVAL=1 # defaults to 1
       # - USERNAME=admin
       # - PASSWORD=admin
 
 volumes:
+  # credentials: {}
   logvolume:
     driver: local
     driver_opts:
