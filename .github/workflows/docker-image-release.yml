@@ -20,7 +20,7 @@ jobs:
         if: ${{ matrix.target == 'arm/v7' }}
       -
         name: Write long target
-        run: echo TARGET_LONG=aarch64-unknown-linux-musl >> $GITHUB_ENV && echo TAG=amd >> $GITHUB_ENV
+        run: echo TARGET_LONG=x86_64-unknown-linux-musl >> $GITHUB_ENV && echo TAG=amd >> $GITHUB_ENV
         if: ${{ matrix.target == 'amd64' }}
       -
         name: Checkout
