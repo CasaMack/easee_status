@@ -47,7 +47,7 @@ pub fn get_logger() -> (
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        .with_span_events(FmtSpan::ACTIVE)
+        .with_span_events(FmtSpan::NONE)
         .with_ansi(false)
         .with_max_level(level)
         .with_writer(non_blocking_appender)
